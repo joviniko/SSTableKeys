@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/golang/leveldb/table"
 	"github.com/google/stenographer/filecache"
@@ -23,41 +24,29 @@ func NewIndexFile(filename string, fc *filecache.Cache) (string, error) {
 	}
 
 	iter := ss.Find([]byte{}, nil)
-	protocols := ""
-	ports := ""
-	ips_v4 := ""
-	ips_v6 := ""
+	protocols := []string{}
+	ports := []string{}
+	ips_v4 := []string{}
+	ips_v6 := []string{}
 	for iter.Next() {
 		found_key := iter.Key()
 		ttype := found_key[0]
 
 		if ttype == 1 {
 			proto := int(found_key[1])
-			if protocols == "" {
-				protocols += fmt.Sprintf("%d", proto)
-			} else {
-				protocols += fmt.Sprintf(",%d", proto)
-			}
+			protocols = append(protocols, fmt.Sprintf("%d", proto))
 		} else if ttype == 2 {
 			port := (int(found_key[1]) * 1000) + int(found_key[2])
-			if ports == "" {
-				ports += fmt.Sprintf("%d", port)
-			} else {
-				ports += fmt.Sprintf(",%d", port)
-			}
+			ports = append(ports, fmt.Sprintf("%d", port))
 		} else if ttype == 4 {
-			ipv4_ := net.IP{found_key[1],
+			ipv4 := net.IP{found_key[1],
 				found_key[2],
 				found_key[3],
 				found_key[4]}
 
-			if ips_v4 == "" {
-				ips_v4 += fmt.Sprintf(`"%s"`, ipv4_.String())
-			} else {
-				ips_v4 += fmt.Sprintf(`,"%s"`, ipv4_.String())
-			}
+			ips_v4 = append(ips_v4, ipv4.String())
 		} else if ttype == 6 {
-			ipv6_ := net.IP{found_key[1],
+			ipv6 := net.IP{found_key[1],
 				found_key[2],
 				found_key[3],
 				found_key[4],
@@ -74,15 +63,12 @@ func NewIndexFile(filename string, fc *filecache.Cache) (string, error) {
 				found_key[15],
 				found_key[16]}
 
-			if ips_v6 == "" {
-				ips_v6 += fmt.Sprintf(`"%s"`, ipv6_.String())
-			} else {
-				ips_v6 += fmt.Sprintf(`,"%s"`, ipv6_.String())
-			}
+			ips_v6 = append(ips_v6, ipv6.String())
 		}
 	}
 	iter.Close()
-	out := fmt.Sprintf(`{"protocols":[%s],"ports":[%s],"ipv4":[%s],"ipv6":[%s]}`, protocols, ports, ips_v4, ips_v6)
+	out := fmt.Sprintf(`{"protocols":[%s],"ports":[%s],"ipv4":[%s],"ipv6":[%s]}`,
+		strings.Join(protocols, ","), strings.Join(ports, ","), strings.Join(ips_v4, ","), strings.Join(ips_v6, ","))
 	return out, nil
 }
 
