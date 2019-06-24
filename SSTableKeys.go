@@ -67,7 +67,7 @@ func readIndexFile(filename string, protocolSetCount map[int]int, portSetCount m
 }
 
 func main() {
-	if len(os.Args) != 2 {
+	if len(os.Args) != 2 && len(os.Args) != 4 {
 		os.Exit(1)
 	}
 
@@ -77,6 +77,23 @@ func main() {
 	ipv6SetCount := make(map[string]int)
 
 	folderPath := os.Args[1]
+	startDate := ""
+	endDate := ""
+
+	inputTimestampArgs := regexp.MustCompile(`^\d{10}$`)
+
+	if len(os.Args) == 4 {
+		if !inputTimestampArgs.MatchString(os.Args[2]) || !inputTimestampArgs.MatchString(os.Args[3]) {
+			log.Fatal("wrong timestamp input")
+		}
+
+		startDate = os.Args[2]
+		endDate = os.Args[3]
+
+		if endDate <= startDate {
+			log.Fatal("start timestamp needs to be smaller than end timestamp")
+		}
+	}
 
 	files, err := ioutil.ReadDir(folderPath)
 	if err != nil {
@@ -89,6 +106,13 @@ func main() {
 		fileName := file.Name()
 		if !re.MatchString(fileName) {
 			continue
+		}
+
+		if startDate != "" && endDate != "" {
+			fileNameShort := fileName[:10]
+			if fileNameShort < startDate || endDate < fileNameShort {
+				continue
+			}
 		}
 
 		err := readIndexFile(fmt.Sprintf("%s/%s", folderPath, fileName), protocolSetCount, portSetCount, ipv4SetCount, ipv6SetCount)
