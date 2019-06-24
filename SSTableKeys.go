@@ -97,62 +97,67 @@ func main() {
 		}
 	}
 
-	if len(protocolSetCount) == 0 {
-		log.Fatal("no data")
-	}
-
-	sortedProtocols := make([]int, 0, len(protocolSetCount))
-	for protocol := range protocolSetCount {
-		sortedProtocols = append(sortedProtocols, protocol)
-	}
-	sort.Ints(sortedProtocols)
-
 	protocolsOut := ""
-	for _, key := range sortedProtocols {
-		protocolsOut += fmt.Sprintf(`"%d":%d,`, key, protocolSetCount[key])
-	}
-	protocolsOut = protocolsOut[:len(protocolsOut)-1]
+	if len(protocolSetCount) > 0 {
+		sortedProtocols := make([]int, 0, len(protocolSetCount))
+		for protocol := range protocolSetCount {
+			sortedProtocols = append(sortedProtocols, protocol)
+		}
+		sort.Ints(sortedProtocols)
 
-	sortedPorts := make([]int, 0, len(portSetCount))
-	for port := range portSetCount {
-		sortedPorts = append(sortedPorts, port)
+		for _, key := range sortedProtocols {
+			protocolsOut += fmt.Sprintf(`"%d":%d,`, key, protocolSetCount[key])
+		}
+		protocolsOut = protocolsOut[:len(protocolsOut)-1]
 	}
-	sort.Ints(sortedPorts)
 
 	portsOut := ""
-	for _, key := range sortedPorts {
-		portsOut += fmt.Sprintf(`"%d":%d,`, key, portSetCount[key])
-	}
-	portsOut = portsOut[:len(portsOut)-1]
+	if len(portSetCount) > 0 {
+		sortedPorts := make([]int, 0, len(portSetCount))
+		for port := range portSetCount {
+			sortedPorts = append(sortedPorts, port)
+		}
+		sort.Ints(sortedPorts)
 
-	sortedIPv4 := make([]net.IP, 0, len(ipv4SetCount))
-	for ip := range ipv4SetCount {
-		sortedIPv4 = append(sortedIPv4, net.ParseIP(ip))
+		for _, key := range sortedPorts {
+			portsOut += fmt.Sprintf(`"%d":%d,`, key, portSetCount[key])
+		}
+		portsOut = portsOut[:len(portsOut)-1]
 	}
-	sort.Slice(sortedIPv4, func(i, j int) bool {
-		return bytes.Compare(sortedIPv4[i], sortedIPv4[j]) < 0
-	})
 
 	ipv4Out := ""
-	for _, key := range sortedIPv4 {
-		ipString := key.String()
-		ipv4Out += fmt.Sprintf(`"%s":%d,`, ipString, ipv4SetCount[ipString])
-	}
-	ipv4Out = ipv4Out[:len(ipv4Out)-1]
+	if len(ipv4SetCount) > 0 {
+		sortedIPv4 := make([]net.IP, 0, len(ipv4SetCount))
+		for ip := range ipv4SetCount {
+			sortedIPv4 = append(sortedIPv4, net.ParseIP(ip))
+		}
+		sort.Slice(sortedIPv4, func(i, j int) bool {
+			return bytes.Compare(sortedIPv4[i], sortedIPv4[j]) < 0
+		})
 
-	sortedIPv6 := make([]net.IP, 0, len(ipv6SetCount))
-	for ip := range ipv6SetCount {
-		sortedIPv6 = append(sortedIPv6, net.ParseIP(ip))
+		for _, key := range sortedIPv4 {
+			ipString := key.String()
+			ipv4Out += fmt.Sprintf(`"%s":%d,`, ipString, ipv4SetCount[ipString])
+		}
+		ipv4Out = ipv4Out[:len(ipv4Out)-1]
 	}
-	sort.Slice(sortedIPv6, func(i, j int) bool {
-		return bytes.Compare(sortedIPv6[i], sortedIPv6[j]) < 0
-	})
+
 	ipv6Out := ""
-	for _, key := range sortedIPv6 {
-		ipString := key.String()
-		ipv6Out += fmt.Sprintf(`"%s":%d,`, ipString, ipv6SetCount[ipString])
+	if len(ipv6SetCount) > 0 {
+		sortedIPv6 := make([]net.IP, 0, len(ipv6SetCount))
+		for ip := range ipv6SetCount {
+			sortedIPv6 = append(sortedIPv6, net.ParseIP(ip))
+		}
+		sort.Slice(sortedIPv6, func(i, j int) bool {
+			return bytes.Compare(sortedIPv6[i], sortedIPv6[j]) < 0
+		})
+
+		for _, key := range sortedIPv6 {
+			ipString := key.String()
+			ipv6Out += fmt.Sprintf(`"%s":%d,`, ipString, ipv6SetCount[ipString])
+		}
+		ipv6Out = ipv6Out[:len(ipv6Out)-1]
 	}
-	ipv6Out = ipv6Out[:len(ipv6Out)-1]
 
 	out := fmt.Sprintf(`{"protocols":{%s},"ports":{%s},"ipv4":{%s},"ipv6":{%s}}`,
 		protocolsOut,
