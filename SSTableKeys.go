@@ -10,26 +10,28 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/golang/leveldb/table"
 )
 
 const majorVersionNumber = 2
 
-func readIndexFile(filename string, protocolSetCount map[int]int, portSetCount map[int]int, ipv4SetCount map[string]int, ipv6SetCount map[string]int) error {
+func readIndexFile(folderPath string, filename string, dataFolderPath string, protocolSetCount map[int]int, portSetCount map[int]int, ipv4SetCount map[string]int, ipv6SetCount map[string]int, totalSize *int64) error {
 
-	fh, fhErr := os.Open(filename)
+	filePath := fmt.Sprintf("%s/%s", folderPath, filename)
+	fh, fhErr := os.Open(filePath)
 
 	if fhErr != nil {
-		return fmt.Errorf("invalid file %q. %v", filename, fhErr)
+		return fmt.Errorf("invalid file %q. %v", filePath, fhErr)
 	}
 	ss := table.NewReader(fh, nil)
 	if versions, err := ss.Get([]byte{0}, nil); err != nil {
-		return fmt.Errorf("invalid index file %q missing versions record: %v", filename, err)
+		return fmt.Errorf("invalid index file %q missing versions record: %v", filePath, err)
 	} else if len(versions) != 8 {
-		return fmt.Errorf("invalid index file %q invalid versions record: %v", filename, versions)
+		return fmt.Errorf("invalid index file %q invalid versions record: %v", filePath, versions)
 	} else if major := binary.BigEndian.Uint32(versions[:4]); major != majorVersionNumber {
-		return fmt.Errorf("invalid index file %q: version mismatch, want %d got %d", filename, majorVersionNumber, major)
+		return fmt.Errorf("invalid index file %q: version mismatch, want %d got %d", filePath, majorVersionNumber, major)
 	}
 
 	iter := ss.Find([]byte{}, nil)
@@ -63,6 +65,12 @@ func readIndexFile(filename string, protocolSetCount map[int]int, portSetCount m
 	iter.Close()
 	fh.Close()
 
+	// get PKT0 filesize
+	dataFileStat, err := os.Stat(fmt.Sprintf("%s/%s", dataFolderPath, filename))
+	if err == nil {
+		*totalSize = *totalSize + dataFileStat.Size()
+	}
+
 	return nil
 }
 
@@ -79,6 +87,7 @@ func main() {
 	folderPath := os.Args[1]
 	startDate := ""
 	endDate := ""
+	totalSize := int64(0)
 
 	inputTimestampArgs := regexp.MustCompile(`^\d{10}$`)
 
@@ -115,7 +124,9 @@ func main() {
 			}
 		}
 
-		err := readIndexFile(fmt.Sprintf("%s/%s", folderPath, fileName), protocolSetCount, portSetCount, ipv4SetCount, ipv6SetCount)
+		dataFolderPath := strings.Replace(folderPath, "IDX0", "PKT0", 1)
+
+		err := readIndexFile(folderPath, fileName, dataFolderPath, protocolSetCount, portSetCount, ipv4SetCount, ipv6SetCount, &totalSize)
 		if err != nil {
 			continue
 		}
@@ -183,7 +194,8 @@ func main() {
 		ipv6Out = ipv6Out[:len(ipv6Out)-1]
 	}
 
-	out := fmt.Sprintf(`{"protocols":{%s},"ports":{%s},"ipv4":{%s},"ipv6":{%s}}`,
+	out := fmt.Sprintf(`{"totalSize": %d, "protocols":{%s},"ports":{%s},"ipv4":{%s},"ipv6":{%s}}`,
+		totalSize,
 		protocolsOut,
 		portsOut,
 		ipv4Out,
