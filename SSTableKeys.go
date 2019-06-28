@@ -10,6 +10,7 @@ import (
 	"os"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/golang/leveldb/table"
@@ -85,8 +86,8 @@ func main() {
 	ipv6SetCount := make(map[string]int)
 
 	folderPath := os.Args[1]
-	startDate := ""
-	endDate := ""
+	startDate := -1
+	endDate := -1
 	totalSize := int64(0)
 
 	inputTimestampArgs := regexp.MustCompile(`^\d{10}$`)
@@ -96,8 +97,8 @@ func main() {
 			log.Fatal("wrong timestamp input")
 		}
 
-		startDate = os.Args[2]
-		endDate = os.Args[3]
+		startDate, _ = strconv.Atoi(os.Args[2])
+		endDate, _ = strconv.Atoi(os.Args[3])
 
 		if endDate <= startDate {
 			log.Fatal("start timestamp needs to be smaller than end timestamp")
@@ -117,9 +118,9 @@ func main() {
 			continue
 		}
 
-		if startDate != "" && endDate != "" {
-			fileNameShort := fileName[:10]
-			if fileNameShort < startDate || endDate < fileNameShort {
+		if startDate != -1 && endDate != -1 {
+			fileNameShort, err := strconv.Atoi(fileName[:10])
+			if err != nil || fileNameShort < startDate-60 || endDate+60 < fileNameShort {
 				continue
 			}
 		}
