@@ -1,15 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"os"
 	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -133,74 +132,17 @@ func main() {
 		}
 	}
 
-	protocolsOut := ""
-	if len(protocolSetCount) > 0 {
-		sortedProtocols := make([]int, 0, len(protocolSetCount))
-		for protocol := range protocolSetCount {
-			sortedProtocols = append(sortedProtocols, protocol)
-		}
-		sort.Ints(sortedProtocols)
+	protocolsOut, _ := json.Marshal(protocolSetCount)
+	portsOut, _ := json.Marshal(portSetCount)
+	ipv4Out, _ := json.Marshal(ipv4SetCount)
+	ipv6Out, _ := json.Marshal(ipv6SetCount)
 
-		for _, key := range sortedProtocols {
-			protocolsOut += fmt.Sprintf(`"%d":%d,`, key, protocolSetCount[key])
-		}
-		protocolsOut = protocolsOut[:len(protocolsOut)-1]
-	}
-
-	portsOut := ""
-	if len(portSetCount) > 0 {
-		sortedPorts := make([]int, 0, len(portSetCount))
-		for port := range portSetCount {
-			sortedPorts = append(sortedPorts, port)
-		}
-		sort.Ints(sortedPorts)
-
-		for _, key := range sortedPorts {
-			portsOut += fmt.Sprintf(`"%d":%d,`, key, portSetCount[key])
-		}
-		portsOut = portsOut[:len(portsOut)-1]
-	}
-
-	ipv4Out := ""
-	if len(ipv4SetCount) > 0 {
-		sortedIPv4 := make([]net.IP, 0, len(ipv4SetCount))
-		for ip := range ipv4SetCount {
-			sortedIPv4 = append(sortedIPv4, net.ParseIP(ip))
-		}
-		sort.Slice(sortedIPv4, func(i, j int) bool {
-			return bytes.Compare(sortedIPv4[i], sortedIPv4[j]) < 0
-		})
-
-		for _, key := range sortedIPv4 {
-			ipString := key.String()
-			ipv4Out += fmt.Sprintf(`"%s":%d,`, ipString, ipv4SetCount[ipString])
-		}
-		ipv4Out = ipv4Out[:len(ipv4Out)-1]
-	}
-
-	ipv6Out := ""
-	if len(ipv6SetCount) > 0 {
-		sortedIPv6 := make([]net.IP, 0, len(ipv6SetCount))
-		for ip := range ipv6SetCount {
-			sortedIPv6 = append(sortedIPv6, net.ParseIP(ip))
-		}
-		sort.Slice(sortedIPv6, func(i, j int) bool {
-			return bytes.Compare(sortedIPv6[i], sortedIPv6[j]) < 0
-		})
-
-		for _, key := range sortedIPv6 {
-			ipString := key.String()
-			ipv6Out += fmt.Sprintf(`"%s":%d,`, ipString, ipv6SetCount[ipString])
-		}
-		ipv6Out = ipv6Out[:len(ipv6Out)-1]
-	}
-
-	out := fmt.Sprintf(`{"totalSize": %d, "protocols":{%s},"ports":{%s},"ipv4":{%s},"ipv6":{%s}}`,
+	out := fmt.Sprintf(`{"totalSize": %d, "protocols":%s,"ports":%s,"ipv4":%s,"ipv6":%s}`,
 		totalSize,
-		protocolsOut,
-		portsOut,
-		ipv4Out,
-		ipv6Out)
+		string(protocolsOut),
+		string(portsOut),
+		string(ipv4Out),
+		string(ipv6Out))
 
 	fmt.Println(out)
 }
