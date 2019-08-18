@@ -11,27 +11,69 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/golang/leveldb/table"
 )
 
+var concurrentWorkers = 2
+
+var re = regexp.MustCompile(`^\d{16}$`)
+
+var mutexProto = &sync.Mutex{}
+var mutexPort = &sync.Mutex{}
+var mutexIP4 = &sync.Mutex{}
+var mutexIP6 = &sync.Mutex{}
+var mutexSize = &sync.Mutex{}
+
+var protocolSetCount = make(map[int]int)
+var portSetCount = make(map[int]int)
+var ipv4SetCount = make(map[string]int)
+var ipv6SetCount = make(map[string]int)
+var totalSize = int64(0)
+
+var wg sync.WaitGroup
+
 const majorVersionNumber = 2
 
-func readIndexFile(folderPath string, filename string, dataFolderPath string, protocolSetCount map[int]int, portSetCount map[int]int, ipv4SetCount map[string]int, ipv6SetCount map[string]int, totalSize *int64) error {
+func worker(id int, jobs <-chan string, folderPath string, dataFolderPath string, startDate int, endDate int) {
+	for filename := range jobs {
+		if !re.MatchString(filename) {
+			wg.Done()
+		} else if startDate != -1 && endDate != -1 {
+			fileNameShort, err := strconv.Atoi(filename[:10])
+			if err != nil || fileNameShort < startDate-60 || endDate+60 < fileNameShort {
+				wg.Done()
+			}
+		} else {
+			readIndexFile(filename, folderPath, dataFolderPath)
+		}
+	}
+}
+
+func readIndexFile(filename string, folderPath string, dataFolderPath string) {
 
 	filePath := fmt.Sprintf("%s/%s", folderPath, filename)
 	fh, fhErr := os.Open(filePath)
 
 	if fhErr != nil {
-		return fmt.Errorf("invalid file %q. %v", filePath, fhErr)
+		wg.Done()
+		fh.Close()
+		return
 	}
 	ss := table.NewReader(fh, nil)
 	if versions, err := ss.Get([]byte{0}, nil); err != nil {
-		return fmt.Errorf("invalid index file %q missing versions record: %v", filePath, err)
+		wg.Done()
+		fh.Close()
+		return
 	} else if len(versions) != 8 {
-		return fmt.Errorf("invalid index file %q invalid versions record: %v", filePath, versions)
+		wg.Done()
+		fh.Close()
+		return
 	} else if major := binary.BigEndian.Uint32(versions[:4]); major != majorVersionNumber {
-		return fmt.Errorf("invalid index file %q: version mismatch, want %d got %d", filePath, majorVersionNumber, major)
+		wg.Done()
+		fh.Close()
+		return
 	}
 
 	iter := ss.Find([]byte{}, nil)
@@ -42,16 +84,22 @@ func readIndexFile(folderPath string, filename string, dataFolderPath string, pr
 
 		if ttype == 1 {
 			proto := int(foundKey[1])
+			mutexProto.Lock()
 			protocolSetCount[proto] += len(iter.Value()) / 4
+			mutexProto.Unlock()
 		} else if ttype == 2 {
 			port := int(binary.BigEndian.Uint16([]byte{foundKey[1], foundKey[2]}))
+			mutexPort.Lock()
 			portSetCount[port] += len(iter.Value()) / 4
+			mutexPort.Unlock()
 		} else if ttype == 4 {
 			ipv4 := net.IP{foundKey[1],
 				foundKey[2],
 				foundKey[3],
 				foundKey[4]}
+			mutexIP4.Lock()
 			ipv4SetCount[ipv4.String()] += len(iter.Value()) / 4
+			mutexIP4.Unlock()
 		} else if ttype == 6 {
 			ipv6 := net.IP{
 				foundKey[1], foundKey[2], foundKey[3], foundKey[4],
@@ -59,7 +107,9 @@ func readIndexFile(folderPath string, filename string, dataFolderPath string, pr
 				foundKey[9], foundKey[10], foundKey[11], foundKey[12],
 				foundKey[13], foundKey[14], foundKey[15], foundKey[16],
 			}
+			mutexIP6.Lock()
 			ipv6SetCount[ipv6.String()] += len(iter.Value()) / 4
+			mutexIP6.Unlock()
 		}
 	}
 	iter.Close()
@@ -68,26 +118,24 @@ func readIndexFile(folderPath string, filename string, dataFolderPath string, pr
 	// get PKT0 filesize
 	dataFileStat, err := os.Stat(fmt.Sprintf("%s/%s", dataFolderPath, filename))
 	if err == nil {
-		*totalSize = *totalSize + dataFileStat.Size()
+		mutexSize.Lock()
+		totalSize += dataFileStat.Size()
+		mutexSize.Unlock()
 	}
 
-	return nil
+	wg.Done()
 }
 
 func main() {
 	if len(os.Args) != 2 && len(os.Args) != 4 {
-		os.Exit(1)
+		log.Fatal("missing arguments")
 	}
 
-	protocolSetCount := make(map[int]int)
-	portSetCount := make(map[int]int)
-	ipv4SetCount := make(map[string]int)
-	ipv6SetCount := make(map[string]int)
-
 	folderPath := os.Args[1]
+	dataFolderPath := strings.Replace(folderPath, "IDX0", "PKT0", 1)
+
 	startDate := -1
 	endDate := -1
-	totalSize := int64(0)
 
 	inputTimestampArgs := regexp.MustCompile(`^\d{10}$`)
 
@@ -109,28 +157,19 @@ func main() {
 		log.Fatal(err)
 	}
 
-	re := regexp.MustCompile(`^\d{16}$`)
+	jobs := make(chan string, len(files))
+
+	for w := 1; w <= concurrentWorkers; w++ {
+		go worker(w, jobs, folderPath, dataFolderPath, startDate, endDate)
+	}
 
 	for _, file := range files {
-		fileName := file.Name()
-		if !re.MatchString(fileName) {
-			continue
-		}
-
-		if startDate != -1 && endDate != -1 {
-			fileNameShort, err := strconv.Atoi(fileName[:10])
-			if err != nil || fileNameShort < startDate-60 || endDate+60 < fileNameShort {
-				continue
-			}
-		}
-
-		dataFolderPath := strings.Replace(folderPath, "IDX0", "PKT0", 1)
-
-		err := readIndexFile(folderPath, fileName, dataFolderPath, protocolSetCount, portSetCount, ipv4SetCount, ipv6SetCount, &totalSize)
-		if err != nil {
-			continue
-		}
+		wg.Add(1)
+		jobs <- file.Name()
 	}
+
+	close(jobs)
+	wg.Wait()
 
 	protocolsOut, _ := json.Marshal(protocolSetCount)
 	portsOut, _ := json.Marshal(portSetCount)
