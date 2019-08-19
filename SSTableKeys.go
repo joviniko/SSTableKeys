@@ -16,7 +16,7 @@ import (
 	"github.com/golang/leveldb/table"
 )
 
-var concurrentWorkers = 2
+var concurrentWorkers = 4
 
 var re = regexp.MustCompile(`^\d{16}$`)
 
@@ -38,16 +38,17 @@ const majorVersionNumber = 2
 
 func worker(id int, jobs <-chan string, folderPath string, dataFolderPath string, startDate int, endDate int) {
 	for filename := range jobs {
-		if !re.MatchString(filename) {
-			wg.Done()
-		} else if startDate != -1 && endDate != -1 {
-			fileNameShort, err := strconv.Atoi(filename[:10])
-			if err != nil || fileNameShort < startDate-60 || endDate+60 < fileNameShort {
-				wg.Done()
+		if re.MatchString(filename) {
+			if startDate != -1 && endDate != -1 {
+				fileNameShort, err := strconv.Atoi(filename[:10])
+				if err == nil && fileNameShort >= startDate-60 && endDate+60 >= fileNameShort {
+					readIndexFile(filename, folderPath, dataFolderPath)
+				}
+			} else {
+				readIndexFile(filename, folderPath, dataFolderPath)
 			}
-		} else {
-			readIndexFile(filename, folderPath, dataFolderPath)
 		}
+		wg.Done()
 	}
 }
 
@@ -57,21 +58,17 @@ func readIndexFile(filename string, folderPath string, dataFolderPath string) {
 	fh, fhErr := os.Open(filePath)
 
 	if fhErr != nil {
-		wg.Done()
 		fh.Close()
 		return
 	}
 	ss := table.NewReader(fh, nil)
 	if versions, err := ss.Get([]byte{0}, nil); err != nil {
-		wg.Done()
 		fh.Close()
 		return
 	} else if len(versions) != 8 {
-		wg.Done()
 		fh.Close()
 		return
 	} else if major := binary.BigEndian.Uint32(versions[:4]); major != majorVersionNumber {
-		wg.Done()
 		fh.Close()
 		return
 	}
@@ -122,8 +119,6 @@ func readIndexFile(filename string, folderPath string, dataFolderPath string) {
 		totalSize += dataFileStat.Size()
 		mutexSize.Unlock()
 	}
-
-	wg.Done()
 }
 
 func main() {
@@ -157,7 +152,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	jobs := make(chan string, len(files))
+	jobs := make(chan string, 100)
 
 	for w := 1; w <= concurrentWorkers; w++ {
 		go worker(w, jobs, folderPath, dataFolderPath, startDate, endDate)
