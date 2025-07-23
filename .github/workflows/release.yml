@@ -1,0 +1,140 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+        
+    - name: Get dependencies
+      run: go mod tidy
+      
+    - name: Run tests
+      run: go test -v
+      
+    - name: Build for multiple platforms
+      run: |
+        # Build for Linux (amd64)
+        GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o SSTableKeys-linux-amd64 SSTableKeys.go
+        
+        # Build for Linux (arm64)
+        GOOS=linux GOARCH=arm64 go build -ldflags="-s -w" -o SSTableKeys-linux-arm64 SSTableKeys.go
+        
+        # Build for macOS (amd64)
+        GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o SSTableKeys-darwin-amd64 SSTableKeys.go
+        
+        # Build for macOS (arm64)
+        GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o SSTableKeys-darwin-arm64 SSTableKeys.go
+        
+        # Build for Windows (amd64)
+        GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o SSTableKeys-windows-amd64.exe SSTableKeys.go
+        
+    - name: Create checksums
+      run: |
+        sha256sum SSTableKeys-* > checksums.txt
+        
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+        body: |
+          ## Changes
+          
+          See the [commit history](https://github.com/${{ github.repository }}/commits/${{ github.ref }}) for detailed changes.
+          
+          ## Downloads
+          
+          Download the appropriate binary for your platform:
+          - **Linux (x64)**: SSTableKeys-linux-amd64
+          - **Linux (ARM64)**: SSTableKeys-linux-arm64
+          - **macOS (Intel)**: SSTableKeys-darwin-amd64
+          - **macOS (Apple Silicon)**: SSTableKeys-darwin-arm64
+          - **Windows (x64)**: SSTableKeys-windows-amd64.exe
+          
+          ## Usage
+          
+          ```bash
+          # Make executable (Linux/macOS)
+          chmod +x SSTableKeys-*
+          
+          # Run with flags
+          ./SSTableKeys-* -path /path/to/IDX0/ -workers 8
+          ```
+          
+    - name: Upload Linux amd64
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./SSTableKeys-linux-amd64
+        asset_name: SSTableKeys-linux-amd64
+        asset_content_type: application/octet-stream
+        
+    - name: Upload Linux arm64
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./SSTableKeys-linux-arm64
+        asset_name: SSTableKeys-linux-arm64
+        asset_content_type: application/octet-stream
+        
+    - name: Upload macOS amd64
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./SSTableKeys-darwin-amd64
+        asset_name: SSTableKeys-darwin-amd64
+        asset_content_type: application/octet-stream
+        
+    - name: Upload macOS arm64
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./SSTableKeys-darwin-arm64
+        asset_name: SSTableKeys-darwin-arm64
+        asset_content_type: application/octet-stream
+        
+    - name: Upload Windows amd64
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./SSTableKeys-windows-amd64.exe
+        asset_name: SSTableKeys-windows-amd64.exe
+        asset_content_type: application/octet-stream
+        
+    - name: Upload checksums
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./checksums.txt
+        asset_name: checksums.txt
+        asset_content_type: text/plain
