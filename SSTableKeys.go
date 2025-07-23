@@ -79,34 +79,6 @@ func (m *MetricsData) AddSize(size int64) {
 	m.TotalSize += size
 }
 
-func parseProtocolKey(key []byte) (int, int) {
-	proto := int(key[1])
-	count := len(key[4:]) / 4
-	return proto, count
-}
-
-func parsePortKey(key []byte) (int, int) {
-	port := int(binary.BigEndian.Uint16([]byte{key[1], key[2]}))
-	count := len(key[4:]) / 4
-	return port, count
-}
-
-func parseIPv4Key(key []byte) (string, int) {
-	ipv4 := net.IP{key[1], key[2], key[3], key[4]}
-	count := len(key[4:]) / 4
-	return ipv4.String(), count
-}
-
-func parseIPv6Key(key []byte) (string, int) {
-	ipv6 := net.IP{
-		key[1], key[2], key[3], key[4],
-		key[5], key[6], key[7], key[8],
-		key[9], key[10], key[11], key[12],
-		key[13], key[14], key[15], key[16],
-	}
-	count := len(key[16:]) / 4
-	return ipv6.String(), count
-}
 
 func processKeyValue(keyType byte, key []byte, valueLen int, metrics *MetricsData) {
 	switch keyType {

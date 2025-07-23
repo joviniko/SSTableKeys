@@ -175,64 +175,6 @@ func TestMetricsDataConcurrency(t *testing.T) {
 	}
 }
 
-func TestParseProtocolKey(t *testing.T) {
-	key := []byte{1, 6, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8}
-	proto, count := parseProtocolKey(key)
-	
-	if proto != 6 {
-		t.Errorf("Expected protocol 6, got %d", proto)
-	}
-	
-	expectedCount := len(key[4:]) / 4
-	if count != expectedCount {
-		t.Errorf("Expected count %d, got %d", expectedCount, count)
-	}
-}
-
-func TestParsePortKey(t *testing.T) {
-	key := []byte{2, 0, 80, 0, 1, 2, 3, 4, 5, 6, 7, 8}
-	port, count := parsePortKey(key)
-	
-	if port != 80 {
-		t.Errorf("Expected port 80, got %d", port)
-	}
-	
-	expectedCount := len(key[4:]) / 4
-	if count != expectedCount {
-		t.Errorf("Expected count %d, got %d", expectedCount, count)
-	}
-}
-
-func TestParseIPv4Key(t *testing.T) {
-	key := []byte{4, 192, 168, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8}
-	ip, count := parseIPv4Key(key)
-	
-	expectedIP := "192.168.1.1"
-	if ip != expectedIP {
-		t.Errorf("Expected IP %s, got %s", expectedIP, ip)
-	}
-	
-	expectedCount := len(key[4:]) / 4
-	if count != expectedCount {
-		t.Errorf("Expected count %d, got %d", expectedCount, count)
-	}
-}
-
-func TestParseIPv6Key(t *testing.T) {
-	key := []byte{6, 0x20, 0x01, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 3, 4}
-	ip, count := parseIPv6Key(key)
-	
-	expectedIP := "2001:db8::1"
-	if ip != expectedIP {
-		t.Errorf("Expected IP %s, got %s", expectedIP, ip)
-	}
-	
-	expectedCount := len(key[16:]) / 4
-	if count != expectedCount {
-		t.Errorf("Expected count %d, got %d", expectedCount, count)
-	}
-}
-
 func TestProcessKeyValue(t *testing.T) {
 	metrics := NewMetricsData()
 	
