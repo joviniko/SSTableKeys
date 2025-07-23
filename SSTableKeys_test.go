@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"os"
 	"sync"
 	"testing"
@@ -219,12 +220,16 @@ func TestProcessKeyValue(t *testing.T) {
 }
 
 func TestParseArgsValid(t *testing.T) {
-	// Save original args
+	// Save original args and reset flags
 	oldArgs := os.Args
-	defer func() { os.Args = oldArgs }()
+	defer func() { 
+		os.Args = oldArgs
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	}()
 	
 	// Test basic folder path
-	os.Args = []string{"SSTableKeys", "/path/to/IDX0"}
+	os.Args = []string{"SSTableKeys", "-path", "/path/to/IDX0"}
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	config, err := parseArgs()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -252,12 +257,16 @@ func TestParseArgsValid(t *testing.T) {
 }
 
 func TestParseArgsWithTimestamps(t *testing.T) {
-	// Save original args
+	// Save original args and reset flags
 	oldArgs := os.Args
-	defer func() { os.Args = oldArgs }()
+	defer func() { 
+		os.Args = oldArgs
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	}()
 	
 	// Test with valid timestamps
-	os.Args = []string{"SSTableKeys", "/path/to/IDX0", "1234567890", "1234567900"}
+	os.Args = []string{"SSTableKeys", "-path", "/path/to/IDX0", "-start", "1234567890", "-end", "1234567900"}
+	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 	config, err := parseArgs()
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
@@ -275,20 +284,24 @@ func TestParseArgsWithTimestamps(t *testing.T) {
 func TestParseArgsInvalidArgs(t *testing.T) {
 	// Save original args
 	oldArgs := os.Args
-	defer func() { os.Args = oldArgs }()
+	defer func() { 
+		os.Args = oldArgs
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	}()
 	
 	tests := []struct {
 		name string
 		args []string
 	}{
-		{"no args", []string{"SSTableKeys"}},
-		{"too many args", []string{"SSTableKeys", "path", "start", "end", "extra"}},
-		{"three args", []string{"SSTableKeys", "path", "start"}},
+		{"no path", []string{"SSTableKeys"}},
+		{"only start timestamp", []string{"SSTableKeys", "-path", "/path/to/IDX0", "-start", "1234567890"}},
+		{"only end timestamp", []string{"SSTableKeys", "-path", "/path/to/IDX0", "-end", "1234567890"}},
 	}
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			os.Args = tt.args
+			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 			_, err := parseArgs()
 			if err == nil {
 				t.Error("Expected error for invalid arguments")
@@ -300,23 +313,23 @@ func TestParseArgsInvalidArgs(t *testing.T) {
 func TestParseArgsInvalidTimestamps(t *testing.T) {
 	// Save original args
 	oldArgs := os.Args
-	defer func() { os.Args = oldArgs }()
+	defer func() { 
+		os.Args = oldArgs
+		flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
+	}()
 	
 	tests := []struct {
 		name  string
 		start string
 		end   string
 	}{
-		{"invalid start format", "123456789", "1234567890"},
-		{"invalid end format", "1234567890", "123456789"},
-		{"non-numeric start", "abcdefghij", "1234567890"},
-		{"non-numeric end", "1234567890", "abcdefghij"},
 		{"end before start", "1234567900", "1234567890"},
 	}
 	
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Args = []string{"SSTableKeys", "/path/to/IDX0", tt.start, tt.end}
+			os.Args = []string{"SSTableKeys", "-path", "/path/to/IDX0", "-start", tt.start, "-end", tt.end}
+			flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
 			_, err := parseArgs()
 			if err == nil {
 				t.Error("Expected error for invalid timestamps")

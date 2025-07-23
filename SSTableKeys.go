@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -161,40 +162,35 @@ func readIndexFile(filename string, config *Config, metrics *MetricsData) {
 }
 
 func parseArgs() (*Config, error) {
-	if len(os.Args) != 2 && len(os.Args) != 4 {
-		return nil, fmt.Errorf("usage: %s <folder_path> [start_timestamp end_timestamp]", os.Args[0])
+	var folderPath = flag.String("path", "", "Path to IDX0 folder (required)")
+	var startDate = flag.Int("start", -1, "Start timestamp (Unix timestamp)")
+	var endDate = flag.Int("end", -1, "End timestamp (Unix timestamp)")
+	var workers = flag.Int("workers", concurrentWorkers, "Number of concurrent workers")
+
+	flag.Parse()
+
+	if *folderPath == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+
+	if (*startDate != -1 && *endDate == -1) || (*startDate == -1 && *endDate != -1) {
+		return nil, fmt.Errorf("both start and end timestamps must be provided together")
+	}
+
+	if *startDate != -1 && *endDate != -1 && *endDate <= *startDate {
+		return nil, fmt.Errorf("start timestamp must be smaller than end timestamp")
+	}
+
+	if *workers <= 0 {
+		return nil, fmt.Errorf("workers count must be positive")
 	}
 
 	config := &Config{
-		FolderPath:     os.Args[1],
-		DataFolderPath: strings.Replace(os.Args[1], "IDX0", "PKT0", 1),
-		StartDate:      -1,
-		EndDate:        -1,
-		Workers:        concurrentWorkers,
-	}
-
-	if len(os.Args) == 4 {
-		inputTimestampArgs := regexp.MustCompile(`^\d{10}$`)
-		if !inputTimestampArgs.MatchString(os.Args[2]) || !inputTimestampArgs.MatchString(os.Args[3]) {
-			return nil, fmt.Errorf("invalid timestamp format")
-		}
-
-		startDate, err := strconv.Atoi(os.Args[2])
-		if err != nil {
-			return nil, fmt.Errorf("invalid start timestamp: %v", err)
-		}
-
-		endDate, err := strconv.Atoi(os.Args[3])
-		if err != nil {
-			return nil, fmt.Errorf("invalid end timestamp: %v", err)
-		}
-
-		if endDate <= startDate {
-			return nil, fmt.Errorf("start timestamp must be smaller than end timestamp")
-		}
-
-		config.StartDate = startDate
-		config.EndDate = endDate
+		FolderPath:     *folderPath,
+		DataFolderPath: strings.Replace(*folderPath, "IDX0", "PKT0", 1),
+		StartDate:      *startDate,
+		EndDate:        *endDate,
+		Workers:        *workers,
 	}
 
 	return config, nil

@@ -35,18 +35,46 @@ go build -ldflags="-s -w" SSTableKeys.go
 
 ## Usage
 
+### Command-line flags
+
+```bash
+Usage of ./SSTableKeys:
+  -end int
+    	End timestamp (Unix timestamp) (default -1)
+  -path string
+    	Path to IDX0 folder (required)
+  -start int
+    	Start timestamp (Unix timestamp) (default -1)
+  -workers int
+    	Number of concurrent workers (default 4)
+```
+
 ### Basic usage
 
 Process all files in IDX0 directory:
 ```bash
-./SSTableKeys /path/to/IDX0/
+./SSTableKeys -path /path/to/IDX0/
 ```
 
 ### Timestamp filtering
 
 Process files within timestamp range (Unix timestamps):
 ```bash
-./SSTableKeys /path/to/IDX0/ 1234567890 1234567900
+./SSTableKeys -path /path/to/IDX0/ -start 1234567890 -end 1234567900
+```
+
+### Custom worker count
+
+Process with custom number of workers:
+```bash
+./SSTableKeys -path /path/to/IDX0/ -workers 8
+```
+
+### Combined options
+
+Process with timestamp filtering and custom worker count:
+```bash
+./SSTableKeys -path /path/to/IDX0/ -start 1234567890 -end 1234567900 -workers 8
 ```
 
 ## Development
@@ -58,7 +86,7 @@ go fmt SSTableKeys.go
 
 ### Run with race detection
 ```bash
-go run -race SSTableKeys.go /path/to/data/
+go run -race SSTableKeys.go -path /path/to/data/
 ```
 
 ## How it works
